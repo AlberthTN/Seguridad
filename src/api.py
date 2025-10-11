@@ -87,14 +87,31 @@ async def list_models(_: str = Depends(validate_token)):
                 "model_id": model_id,
                 "provider": config.provider.value,
                 "available": config.is_available,
-                "has_credentials": bool(config.api_key and len(config.api_key) > 10)
+                "has_credentials": bool(config.api_key and len(config.api_key) > 10),
+                "credentials_status": "configured" if config.api_key and len(config.api_key) > 10 else "missing",
+                "api_key_length": len(config.api_key) if config.api_key else 0
             })
+    
+    # Información de debug para diagnóstico
+    debug_info = {
+        "env_vars_loaded": bool(os.getenv('AVAILABLE_MODELS')),
+        "available_models_env": os.getenv('AVAILABLE_MODELS', 'NOT_SET'),
+        "total_models_configured": len(model_service.models),
+        "api_keys_configured": {
+            "openai": bool(os.getenv('OPENAI_API_KEY')),
+            "anthropic": bool(os.getenv('ANTHROPIC_API_KEY')),
+            "google": bool(os.getenv('GOOGLE_API_KEY')),
+            "mistral": bool(os.getenv('MISTRAL_API_KEY')),
+            "cohere": bool(os.getenv('COHERE_API_KEY'))
+        }
+    }
     
     return APIResponse(
         success=True,
         data={
             "models": models_info,
-            "available_models": model_service.get_available_models()
+            "available_models": model_service.get_available_models(),
+            "debug": debug_info
         }
     )
 
