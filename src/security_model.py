@@ -15,6 +15,7 @@ class SecurityResult(BaseModel):
     reasons: List[str] = Field(default_factory=list, description="Razones detectadas que justifican el veredicto")
     suggestions: List[str] = Field(default_factory=list, description="Sugerencias para mitigar o reformular")
     model_used: str = Field(default="", description="Modelo de IA utilizado para el análisis")
+    agent: str = Field(default="", description="Nombre del agente que realizó la solicitud")
 
     def to_json(self) -> Dict:
         """Devuelve el resultado como dict listo para serializar a JSON."""
@@ -33,6 +34,7 @@ class AnalysisRequest(BaseModel):
     text: str = Field(..., min_length=1, max_length=10000, description="Texto a analizar")
     model: str = Field(..., description="Modelo a usar (formato: proveedor:modelo)")
     token: str = Field(..., description="Token de autenticación de 32 caracteres hexadecimales")
+    agent: str = Field(..., min_length=1, max_length=100, description="Nombre del agente que realiza la solicitud")
 
     @validator('token')
     def validate_token_format(cls, v):
@@ -45,6 +47,12 @@ class AnalysisRequest(BaseModel):
         if not re.match(r'^[a-z]+:[a-zA-Z0-9-_.]+$', v):
             raise ValueError('Formato de modelo inválido. Use: proveedor:modelo')
         return v
+
+    @validator('agent')
+    def validate_agent_format(cls, v):
+        if not re.match(r'^[a-zA-Z0-9_\-\s]+$', v):
+            raise ValueError('El nombre del agente solo puede contener letras, números, guiones, guiones bajos y espacios')
+        return v.strip()
 
 
 class APIResponse(BaseModel):

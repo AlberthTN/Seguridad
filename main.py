@@ -10,7 +10,12 @@ import json
 import sys
 import argparse
 import asyncio
+import os
 from typing import Optional, List
+from dotenv import load_dotenv
+
+# Cargar variables de entorno desde .env
+load_dotenv()
 
 from security_model import SecurityRequest, AnalysisRequest
 from security_analyzer import analyze_request

@@ -54,40 +54,41 @@ class AISecurityAnalyzer:
         if cohere_key and len(cohere_key) > 10:
             self.cohere_client = cohere.Client(cohere_key)
     
-    async def analyze_with_ai(self, text: str, model_id: str) -> SecurityResult:
+    async def analyze_with_ai(self, text: str, model_id: str, agent: str = "") -> SecurityResult:
         """
         Analiza el texto usando un modelo de IA específico.
         
         Args:
             text: Texto a analizar
             model_id: ID del modelo en formato 'proveedor:modelo'
+            agent: Nombre del agente que realiza la solicitud
             
         Returns:
             SecurityResult con el análisis de seguridad
         """
         provider_result = model_service.get_model_provider(model_id)
         if not provider_result:
-            return self._create_error_result(f"Modelo '{model_id}' no válido")
+            return self._create_error_result(f"Modelo '{model_id}' no válido", agent)
         
         provider, model_name = provider_result
         
         try:
             if provider.value == 'openai' and self.openai_client:
-                return await self._analyze_with_openai(text, model_name)
+                return await self._analyze_with_openai(text, model_name, agent)
             elif provider.value == 'anthropic' and self.anthropic_client:
-                return await self._analyze_with_anthropic(text, model_name)
+                return await self._analyze_with_anthropic(text, model_name, agent)
             elif provider.value == 'google' and self.google_client:
-                return await self._analyze_with_google(text, model_name)
+                return await self._analyze_with_google(text, model_name, agent)
             elif provider.value == 'mistral' and self.mistral_client:
-                return await self._analyze_with_mistral(text, model_name)
+                return await self._analyze_with_mistral(text, model_name, agent)
             elif provider.value == 'cohere' and self.cohere_client:
-                return await self._analyze_with_cohere(text, model_name)
+                return await self._analyze_with_cohere(text, model_name, agent)
             else:
-                return self._create_error_result(f"Proveedor {provider.value} no disponible")
+                return self._create_error_result(f"Proveedor {provider.value} no disponible", agent)
         except Exception as e:
-            return self._create_error_result(f"Error en análisis con {model_id}: {str(e)}")
+            return self._create_error_result(f"Error en análisis con {model_id}: {str(e)}", agent)
     
-    async def _analyze_with_openai(self, text: str, model_name: str) -> SecurityResult:
+    async def _analyze_with_openai(self, text: str, model_name: str, agent: str = "") -> SecurityResult:
         """Analiza usando OpenAI."""
         prompt = self._create_security_prompt(text)
         
@@ -99,9 +100,9 @@ class AISecurityAnalyzer:
         )
         
         result_text = response.choices[0].message.content
-        return self._parse_ai_response(result_text, f"openai:{model_name}")
+        return self._parse_ai_response(result_text, f"openai:{model_name}", agent)
     
-    async def _analyze_with_anthropic(self, text: str, model_name: str) -> SecurityResult:
+    async def _analyze_with_anthropic(self, text: str, model_name: str, agent: str = "") -> SecurityResult:
         """Analiza usando Anthropic Claude."""
         prompt = self._create_security_prompt(text)
         
@@ -113,9 +114,9 @@ class AISecurityAnalyzer:
         )
         
         result_text = response.content[0].text
-        return self._parse_ai_response(result_text, f"anthropic:{model_name}")
+        return self._parse_ai_response(result_text, f"anthropic:{model_name}", agent)
     
-    async def _analyze_with_google(self, text: str, model_name: str) -> SecurityResult:
+    async def _analyze_with_google(self, text: str, model_name: str, agent: str = "") -> SecurityResult:
         """Analiza usando Google Gemini."""
         prompt = self._create_security_prompt(text)
         
@@ -123,9 +124,9 @@ class AISecurityAnalyzer:
         response = model.generate_content(prompt)
         
         result_text = response.text
-        return self._parse_ai_response(result_text, f"google:{model_name}")
+        return self._parse_ai_response(result_text, f"google:{model_name}", agent)
     
-    async def _analyze_with_mistral(self, text: str, model_name: str) -> SecurityResult:
+    async def _analyze_with_mistral(self, text: str, model_name: str, agent: str = "") -> SecurityResult:
         """Analiza usando Mistral."""
         prompt = self._create_security_prompt(text)
         
@@ -137,9 +138,9 @@ class AISecurityAnalyzer:
         )
         
         result_text = response.choices[0].message.content
-        return self._parse_ai_response(result_text, f"mistral:{model_name}")
+        return self._parse_ai_response(result_text, f"mistral:{model_name}", agent)
     
-    async def _analyze_with_cohere(self, text: str, model_name: str) -> SecurityResult:
+    async def _analyze_with_cohere(self, text: str, model_name: str, agent: str = "") -> SecurityResult:
         """Analiza usando Cohere."""
         prompt = self._create_security_prompt(text)
         
@@ -151,7 +152,7 @@ class AISecurityAnalyzer:
         )
         
         result_text = response.text
-        return self._parse_ai_response(result_text, f"cohere:{model_name}")
+        return self._parse_ai_response(result_text, f"cohere:{model_name}", agent)
     
     def _create_security_prompt(self, text: str) -> str:
         """Crea el prompt para análisis de seguridad."""
@@ -180,7 +181,7 @@ Si detectas contenido hasheado, encriptado o codificado, marca como NO SEGURO (i
 Explica brevemente por qué es seguro o no seguro.
 """
     
-    def _parse_ai_response(self, response_text: str, model_used: str) -> SecurityResult:
+    def _parse_ai_response(self, response_text: str, model_used: str, agent: str = "") -> SecurityResult:
         """Parsea la respuesta del modelo de IA a SecurityResult."""
         try:
             # Extraer JSON de la respuesta
@@ -196,15 +197,16 @@ Explica brevemente por qué es seguro o no seguro.
                     category_scores=data.get('category_scores', {}),
                     reasons=data.get('reasons', []),
                     suggestions=data.get('suggestions', []),
-                    model_used=model_used
+                    model_used=model_used,
+                    agent=agent
                 )
         except (json.JSONDecodeError, ValueError) as e:
             pass
         
         # Fallback: análisis básico por palabras clave
-        return self._fallback_analysis(response_text, model_used)
+        return self._fallback_analysis(response_text, model_used, agent)
     
-    def _fallback_analysis(self, text: str, model_used: str) -> SecurityResult:
+    def _fallback_analysis(self, text: str, model_used: str, agent: str = "") -> SecurityResult:
         """Análisis de fallback cuando no se puede parsear JSON."""
         text_lower = text.lower()
         
@@ -218,10 +220,11 @@ Explica brevemente por qué es seguro o no seguro.
             category_scores={"general": 0.7 if is_unsafe else 0.2},
             reasons=["Análisis de fallback basado en respuesta del modelo"],
             suggestions=["El modelo devolvió una respuesta no estructurada"],
-            model_used=model_used
+            model_used=model_used,
+            agent=agent
         )
     
-    def _create_error_result(self, error_message: str) -> SecurityResult:
+    def _create_error_result(self, error_message: str, agent: str = "") -> SecurityResult:
         """Crea un resultado de error."""
         return SecurityResult(
             is_safe=False,
@@ -229,7 +232,8 @@ Explica brevemente por qué es seguro o no seguro.
             category_scores={"error": 1.0},
             reasons=[error_message],
             suggestions=["Verifique la configuración del modelo"],
-            model_used=""
+            model_used="",
+            agent=agent
         )
 
 

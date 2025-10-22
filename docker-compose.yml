@@ -3,7 +3,7 @@ version: '3.8'
 services:
   seguridad:
     build: .
-    image: alberth121484/seguridad:01.00.001
+    image: alberth121484/seguridad:01.00.002
     container_name: seguridad
     restart: unless-stopped
     stop_grace_period: 30s
@@ -23,6 +23,13 @@ services:
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - MISTRAL_API_KEY=${MISTRAL_API_KEY}
       - COHERE_API_KEY=${COHERE_API_KEY}
+      
+      # BigQuery Configuration
+      - BIGQUERY_PROJECT_ID=${BIGQUERY_PROJECT_ID}
+      - BIGQUERY_DATASET=${BIGQUERY_DATASET}
+      - BIGQUERY_LOCATION=${BIGQUERY_LOCATION}
+      - BIGQUERY_MAX_BYTES_BILLED=${BIGQUERY_MAX_BYTES_BILLED}
+      - GOOGLE_APPLICATION_CREDENTIALS_JSON=${GOOGLE_APPLICATION_CREDENTIALS_JSON}
       
       # Application Configuration
       - TZ=America/Mexico_City

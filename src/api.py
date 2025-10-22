@@ -9,10 +9,13 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Dict, List, Optional
 import uvicorn
 import os
+import time
+import tiktoken
 
 from security_model import AnalysisRequest, APIResponse, SecurityResult
 from model_service import model_service
 from ai_analyzer import ai_analyzer
+from bigquery_service import bigquery_service
 
 app = FastAPI(
     title="Agente de Seguridad API",
@@ -33,6 +36,31 @@ app.add_middleware(
 
 # Esquema de autenticación
 security = HTTPBearer()
+
+
+def calculate_tokens(text: str, model: str = "gpt-3.5-turbo") -> int:
+    """
+    Calcula el número aproximado de tokens para un texto dado.
+    
+    Args:
+        text: Texto a analizar
+        model: Modelo para el cual calcular tokens
+        
+    Returns:
+        Número aproximado de tokens
+    """
+    try:
+        # Usar tiktoken para calcular tokens de manera más precisa
+        if "gpt" in model.lower():
+            encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
+        else:
+            # Para otros modelos, usar una aproximación
+            encoding = tiktoken.get_encoding("cl100k_base")
+        
+        return len(encoding.encode(text))
+    except Exception:
+        # Fallback: aproximación simple (1 token ≈ 4 caracteres)
+        return len(text) // 4
 
 
 def validate_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
@@ -166,6 +194,10 @@ async def analyze_security(
     
     Requiere autenticación por token Bearer.
     """
+    start_time = time.time()
+    success = False
+    result = None
+    
     try:
         # Validar token de autenticación (ya validado por el dependency)
         
@@ -178,14 +210,24 @@ async def analyze_security(
                 model_used=request.model
             )
         
-        # Realizar análisis con el modelo de IA
-        result = await ai_analyzer.analyze_with_ai(request.text, request.model)
+        # Calcular tokens de entrada
+        input_tokens = calculate_tokens(request.text, request.model)
         
-        return APIResponse(
+        # Realizar análisis con el modelo de IA
+        result = await ai_analyzer.analyze_with_ai(request.text, request.model, request.agent)
+        
+        # Calcular tokens de salida (aproximación basada en la respuesta)
+        output_text = str(result.to_json()) if result else ""
+        output_tokens = calculate_tokens(output_text, request.model)
+        
+        success = True
+        response = APIResponse(
             success=True,
             data=result.to_json(),
             model_used=request.model
         )
+        
+        return response
         
     except HTTPException:
         raise
@@ -193,6 +235,26 @@ async def analyze_security(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error interno del servidor: {str(e)}"
+        )
+    finally:
+        # Registrar métricas en BigQuery
+        end_time = time.time()
+        response_time = end_time - start_time
+        
+        # Calcular tokens si no se hizo antes (en caso de error)
+        if 'input_tokens' not in locals():
+            input_tokens = calculate_tokens(request.text, request.model)
+        if 'output_tokens' not in locals():
+            output_tokens = 0
+        
+        # Insertar métrica en BigQuery
+        bigquery_service.insert_interaction_metric(
+            agent_name=request.agent,
+            user_input=request.text,
+            response_time=response_time,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            success=success
         )
 
 
@@ -202,29 +264,93 @@ async def analyze_batch_security(
     _: str = Depends(validate_token)
 ):
     """Analiza múltiples solicitudes en lote."""
+    start_time = time.time()
+    success = False
+    
     try:
         results = []
+        total_input_tokens = 0
+        total_output_tokens = 0
         
         for request in requests:
-            # Validar cada modelo individualmente
-            is_available, message = model_service.check_credentials(request.model)
-            if not is_available:
+            request_start_time = time.time()
+            request_success = False
+            
+            try:
+                # Validar cada modelo individualmente
+                is_available, message = model_service.check_credentials(request.model)
+                if not is_available:
+                    results.append({
+                        "success": False,
+                        "error": message,
+                        "model_used": request.model,
+                        "text": request.text[:100] + "..." if len(request.text) > 100 else request.text
+                    })
+                    
+                    # Registrar métrica individual para solicitud fallida
+                    request_end_time = time.time()
+                    request_response_time = request_end_time - request_start_time
+                    input_tokens = calculate_tokens(request.text, request.model)
+                    
+                    bigquery_service.insert_interaction_metric(
+                        agent_name=request.agent,
+                        user_input=request.text,
+                        response_time=request_response_time,
+                        input_tokens=input_tokens,
+                        output_tokens=0,
+                        success=False
+                    )
+                    continue
+                
+                # Calcular tokens de entrada
+                input_tokens = calculate_tokens(request.text, request.model)
+                total_input_tokens += input_tokens
+                
+                # Analizar cada solicitud
+                result = await ai_analyzer.analyze_with_ai(request.text, request.model, request.agent)
+                
+                # Calcular tokens de salida
+                output_text = str(result.to_json()) if result else ""
+                output_tokens = calculate_tokens(output_text, request.model)
+                total_output_tokens += output_tokens
+                
+                results.append({
+                    "success": True,
+                    "data": result.to_json(),
+                    "model_used": request.model
+                })
+                
+                request_success = True
+                
+            except Exception as e:
                 results.append({
                     "success": False,
-                    "error": message,
+                    "error": str(e),
                     "model_used": request.model,
                     "text": request.text[:100] + "..." if len(request.text) > 100 else request.text
                 })
-                continue
+                
+                # En caso de error, calcular solo tokens de entrada
+                if 'input_tokens' not in locals():
+                    input_tokens = calculate_tokens(request.text, request.model)
+                if 'output_tokens' not in locals():
+                    output_tokens = 0
             
-            # Analizar cada solicitud
-            result = await ai_analyzer.analyze_with_ai(request.text, request.model)
-            results.append({
-                "success": True,
-                "data": result.to_json(),
-                "model_used": request.model
-            })
+            finally:
+                # Registrar métrica individual para cada solicitud
+                request_end_time = time.time()
+                request_response_time = request_end_time - request_start_time
+                
+                bigquery_service.insert_interaction_metric(
+                    agent_name=request.agent,
+                    user_input=request.text,
+                    response_time=request_response_time,
+                    input_tokens=input_tokens if 'input_tokens' in locals() else calculate_tokens(request.text, request.model),
+                    output_tokens=output_tokens if 'output_tokens' in locals() else 0,
+                    success=request_success
+                )
         
+        success = True
         return APIResponse(
             success=True,
             data={"results": results}
@@ -234,6 +360,22 @@ async def analyze_batch_security(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Error en procesamiento por lotes: {str(e)}"
+        )
+
+
+@app.get("/health/bigquery", response_model=APIResponse)
+async def health_bigquery():
+    """Verifica el estado de la conexión con BigQuery."""
+    try:
+        connection_status = bigquery_service.test_connection()
+        return APIResponse(
+            success=connection_status["status"] == "success",
+            data=connection_status
+        )
+    except Exception as e:
+        return APIResponse(
+            success=False,
+            error=f"Error verificando BigQuery: {str(e)}"
         )
 
 
