@@ -1,7 +1,7 @@
 from typing import Dict
 
-from .security_model import SecurityRequest
-from .security_analyzer import analyze_request
+from security_model import SecurityRequest
+from security_analyzer import analyze_request
 
 
 def analyze_security(user_input: str) -> Dict:

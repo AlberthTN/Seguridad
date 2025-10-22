@@ -5,18 +5,10 @@ Verifica la disponibilidad de modelos y maneja las claves API.
 
 import os
 from typing import Dict, List, Optional, Tuple
-from .security_model import AIModelProvider, ModelConfig
+from security_model import AIModelProvider, ModelConfig
 
-# Solo cargar .env en desarrollo local, no en Docker
-try:
-    from dotenv import load_dotenv
-    if os.path.exists('.env'):
-        load_dotenv()
-        print("DEBUG: Archivo .env cargado para desarrollo local")
-    else:
-        print("DEBUG: No se encontró archivo .env, usando variables de entorno del sistema (Docker/Portainer)")
-except ImportError:
-    print("DEBUG: dotenv no disponible, usando variables de entorno del sistema")
+# Usar únicamente variables de entorno del sistema (Portainer/Docker)
+print("DEBUG: Usando variables de entorno del sistema (Portainer/Docker)")
 
 
 class ModelService:
@@ -32,6 +24,20 @@ class ModelService:
     def _load_models(self) -> None:
         """Carga las configuraciones de modelos desde las variables de entorno."""
         print("DEBUG: Iniciando carga de modelos...")
+        
+        # Debug detallado de todas las variables de entorno relevantes
+        print("DEBUG: === VARIABLES DE ENTORNO ===")
+        env_vars = ['API_TOKEN', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GOOGLE_API_KEY', 
+                   'MISTRAL_API_KEY', 'COHERE_API_KEY', 'AVAILABLE_MODELS']
+        for var in env_vars:
+            value = os.getenv(var)
+            if value:
+                length = len(value)
+                masked_value = value[:10] + "..." if length > 10 else value
+                print(f"DEBUG: {var} = {masked_value} (longitud: {length})")
+            else:
+                print(f"DEBUG: {var} = NO CONFIGURADA")
+        print("DEBUG: === FIN VARIABLES DE ENTORNO ===")
         
         # Cargar claves API
         api_keys = {
@@ -56,7 +62,7 @@ class ModelService:
         # Si no hay AVAILABLE_MODELS en variables de entorno, usar lista predefinida
         if not available_models_str:
             print("DEBUG: AVAILABLE_MODELS vacío, usando lista predefinida")
-            available_models_str = "openai:gpt-4-turbo,openai:gpt-3.5-turbo,anthropic:claude-3-opus,anthropic:claude-3-sonnet,google:gemini-2.0-flash,mistral:large,cohere:command-r-plus"
+            available_models_str = "openai:gpt-4o,openai:gpt-4o-mini,openai:gpt-4-turbo,openai:gpt-4,openai:gpt-3.5-turbo,anthropic:claude-3-5-sonnet-20241022,anthropic:claude-3-5-haiku-20241022,anthropic:claude-3-opus-20240229,anthropic:claude-3-sonnet-20240229,anthropic:claude-3-haiku-20240307,google:gemini-2.0-flash-exp,google:gemini-1.5-pro,google:gemini-1.5-flash,google:gemini-1.0-pro,mistral:mistral-large-latest,mistral:mistral-medium-latest,mistral:mistral-small-latest,mistral:codestral-latest,cohere:command-a-03-2025,cohere:command-r7b-12-2024,cohere:command-r-08-2024,cohere:command-r-plus-08-2024"
         
         if available_models_str:
             model_entries = available_models_str.split(',')

@@ -20,6 +20,8 @@ cd d:\IA\Agentes2025\seguridad
 docker build -t alberth121484/seguridad:01.00.001 .
 ```
 
+**Nota**: La imagen `alberth121484/seguridad:01.00.001` incluye las últimas mejoras en detección de hashes y contenido encriptado.
+
 ### 3. Probar la Imagen Localmente
 ```bash
 docker run -p 1401:1401 -e API_TOKEN="tu_token" alberth121484/seguridad:01.00.001
@@ -117,6 +119,16 @@ docker-compose pull && docker-compose up -d
 ### Error: Variables de entorno faltantes
 - Asegúrate de que el archivo .env exista
 - Verifica que todas las variables estén definidas
+
+### Verificar Mejoras de Detección
+Para probar las nuevas capacidades de detección de hashes:
+```bash
+# Probar con hash MD5
+curl -X POST "http://localhost:1401/analyze" \
+  -H "Authorization: Bearer tu_token" \
+  -H "Content-Type: application/json" \
+  -d '{"text": "d14f169fbcbb2819042b6da635e86a16"}'
+```
 
 ## 📞 Soporte
 

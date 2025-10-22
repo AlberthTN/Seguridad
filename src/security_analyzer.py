@@ -1,7 +1,7 @@
 from typing import Tuple
 import re
 
-from .security_rules import (
+from security_rules import (
     PROMPT_INJECTION_KEYWORDS,
     DATA_EXFILTRATION_KEYWORDS,
     CODE_EXECUTION_KEYWORDS,
@@ -11,8 +11,11 @@ from .security_rules import (
     SUSPICIOUS_URL_PATTERN,
     CATEGORY_WEIGHTS,
     SUGGESTIONS_BY_CATEGORY,
+    detect_encrypted_content,
+    detect_non_spanish_content,
+    detect_nonsense_content,
 )
-from .security_model import SecurityRequest, SecurityResult
+from security_model import SecurityRequest, SecurityResult
 
 
 def _has_hits(text: str, keywords) -> Tuple[bool, list]:
@@ -91,6 +94,30 @@ def analyze_request(req: SecurityRequest) -> SecurityResult:
     if link_hits:
         reasons.append(f"URLs sospechosas detectadas: {', '.join(link_hits)}")
         suggestions += SUGGESTIONS_BY_CATEGORY["suspicious_links"]
+
+    # Contenido encriptado/codificado
+    has_encrypted, encrypted_issues = detect_encrypted_content(text)
+    w = CATEGORY_WEIGHTS["encrypted_content"]
+    cat_scores["encrypted_content"] = w if has_encrypted else 0.0
+    if has_encrypted:
+        reasons.append(f"Contenido encriptado/codificado detectado: {', '.join(encrypted_issues)}")
+        suggestions += SUGGESTIONS_BY_CATEGORY["encrypted_content"]
+
+    # Contenido no español
+    has_non_spanish, spanish_issues = detect_non_spanish_content(text)
+    w = CATEGORY_WEIGHTS["non_spanish_content"]
+    cat_scores["non_spanish_content"] = w if has_non_spanish else 0.0
+    if has_non_spanish:
+        reasons.append(f"Contenido posiblemente no español: {', '.join(spanish_issues)}")
+        suggestions += SUGGESTIONS_BY_CATEGORY["non_spanish_content"]
+
+    # Contenido sin sentido
+    has_nonsense, nonsense_issues = detect_nonsense_content(text)
+    w = CATEGORY_WEIGHTS["nonsense_content"]
+    cat_scores["nonsense_content"] = w if has_nonsense else 0.0
+    if has_nonsense:
+        reasons.append(f"Contenido sin sentido detectado: {', '.join(nonsense_issues)}")
+        suggestions += SUGGESTIONS_BY_CATEGORY["nonsense_content"]
 
     # Score agregado
     total_score = sum(cat_scores.values())

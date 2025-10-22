@@ -12,11 +12,11 @@ import argparse
 import asyncio
 from typing import Optional, List
 
-from src.security_model import SecurityRequest, AnalysisRequest
-from src.security_analyzer import analyze_request
-from src.api import run_api
-from src.ai_analyzer import ai_analyzer
-from src.model_service import model_service
+from security_model import SecurityRequest, AnalysisRequest
+from security_analyzer import analyze_request
+from api import run_api
+from ai_analyzer import ai_analyzer
+from model_service import model_service
 
 
 def print_help():
@@ -27,14 +27,14 @@ Agente de Seguridad - Análisis de solicitudes con IA
 Uso:
   python main.py "texto a analizar"          # Modo CLI básico
   python main.py --api                        # Modo servidor API
-  python main.py --analyze-ai "texto" --model openai:gpt-4-turbo  # Modo IA
+  python main.py --analyze-ai "texto" --model openai:gpt-4o  # Modo IA
   python main.py --list-models                # Listar modelos disponibles
   python main.py --check-config               # Verificar configuración
 
 Opciones:
   --api               Iniciar servidor API REST
   --analyze-ai TEXT   Analizar texto con modelo de IA específico
-  --model MODEL       Especificar modelo (ej: openai:gpt-4-turbo)
+  --model MODEL       Especificar modelo (ej: openai:gpt-4o)
   --list-models       Listar modelos configurados y disponibles
   --check-config      Verificar configuración y credenciales
   --help              Mostrar esta ayuda
@@ -140,7 +140,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     parser.add_argument('text', nargs='*', help='Texto a analizar')
     parser.add_argument('--api', action='store_true', help='Iniciar servidor API')
     parser.add_argument('--analyze-ai', metavar='TEXT', help='Analizar texto con IA')
-    parser.add_argument('--model', help='Modelo a usar (ej: openai:gpt-4-turbo)')
+    parser.add_argument('--model', help='Modelo a usar (ej: openai:gpt-4o)')
     parser.add_argument('--list-models', action='store_true', help='Listar modelos disponibles')
     parser.add_argument('--check-config', action='store_true', help='Verificar configuración')
     parser.add_argument('--help', action='store_true', help='Mostrar ayuda')

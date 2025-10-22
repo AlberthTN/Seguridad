@@ -9,13 +9,10 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from typing import Dict, List, Optional
 import uvicorn
 import os
-from dotenv import load_dotenv
 
-from .security_model import AnalysisRequest, APIResponse, SecurityResult
-from .model_service import model_service
-from .ai_analyzer import ai_analyzer
-
-load_dotenv()
+from security_model import AnalysisRequest, APIResponse, SecurityResult
+from model_service import model_service
+from ai_analyzer import ai_analyzer
 
 app = FastAPI(
     title="Agente de Seguridad API",
@@ -74,6 +71,49 @@ async def health_check():
             "token_configured": len(model_service.token) == 32
         }
     )
+
+
+@app.get("/debug/env", response_model=APIResponse)
+async def debug_environment(_: str = Depends(validate_token)):
+    """Endpoint de debug para verificar variables de entorno."""
+    try:
+        import os
+        env_vars = ['API_TOKEN', 'OPENAI_API_KEY', 'ANTHROPIC_API_KEY', 'GOOGLE_API_KEY', 
+                   'MISTRAL_API_KEY', 'COHERE_API_KEY', 'AVAILABLE_MODELS']
+        
+        env_info = {}
+        for var in env_vars:
+            value = os.getenv(var)
+            if value:
+                length = len(value)
+                masked_value = value[:10] + "..." if length > 10 else value
+                env_info[var] = {
+                    "configured": True,
+                    "length": length,
+                    "masked_value": masked_value
+                }
+            else:
+                env_info[var] = {
+                    "configured": False,
+                    "length": 0,
+                    "masked_value": "NO_CONFIGURADA"
+                }
+        
+        return {
+            "success": True,
+            "data": {
+                "environment_variables": env_info,
+                "available_models_raw": os.getenv('AVAILABLE_MODELS', 'NO_CONFIGURADA'),
+                "models_loaded": model_service.get_available_models()
+            },
+            "message": "Información de debug de variables de entorno"
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "data": {},
+            "message": f"Error en debug: {str(e)}"
+        }
 
 
 @app.get("/models", response_model=APIResponse)

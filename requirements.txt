@@ -14,3 +14,4 @@ google-generativeai>=0.3.0
 mistralai>=0.1.0
 cohere>=4.0.0
 requests>=2.31.0
+langdetect>=1.0.9

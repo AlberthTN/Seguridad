@@ -1,5 +1,5 @@
 from google.adk.agents import Agent
-from .adk_security_tool import analyze_security
+from adk_security_tool import analyze_security
 
 security_agent = Agent(
     name="security_guard_agent",
