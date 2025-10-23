@@ -33,7 +33,7 @@ def test_direct_insert():
     )
     
     # Referencia a la tabla
-    table_id = f"{project_id}.{dataset_id}.agentes_slack"
+    table_id = f"{project_id}.{dataset_id}.metricas_tools"
     table = client.get_table(table_id)
     
     print("Esquema de la tabla:")

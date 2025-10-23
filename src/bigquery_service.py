@@ -131,7 +131,7 @@ class BigQueryService:
             }
             
             # Referencia a la tabla
-            table_id = f"{self.project_id}.{self.dataset_id}.agentes_slack"
+            table_id = f"{self.project_id}.{self.dataset_id}.metricas_tools"
             table = self.client.get_table(table_id)
             
             # Insertar la fila

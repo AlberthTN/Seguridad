@@ -50,7 +50,7 @@ def setup_bigquery_table():
         ]
         
         # Referencia a la tabla
-        table_id = f"{project_id}.{dataset_id}.agentes_slack"
+        table_id = f"{project_id}.{dataset_id}.metricas_tools"
         
         try:
             # Verificar si la tabla existe
